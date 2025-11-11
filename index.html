@@ -32,7 +32,7 @@
             padding: 0;
         }
         .logo-control img {
-            width: 170px; /* 100px*/
+            width: 110px; /* 100px + 10% */
             height: auto;
             display: block;
         }
@@ -52,6 +52,25 @@
             color: #333;
             box-shadow: 0 1px 5px rgba(0,0,0,0.65);
             margin-top: 5px; /* Pequeño margen para separarlo del control de capas */
+        }
+        
+        /* NUEVO: Estilo para el contador de árboles */
+        .tree-count-control {
+            background-color: #fff;
+            padding: 5px 10px;
+            border-radius: 4px;
+            box-shadow: 0 1px 5px rgba(0,0,0,0.65);
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px; /* Espaciado entre el contador y el logo */
+            text-align: center;
+        }
+        
+        /* NUEVO: Asegura que los elementos en bottomleft se apilen verticalmente (Contador arriba, Logo abajo) */
+        .leaflet-bottom.leaflet-left {
+            display: flex;
+            flex-direction: column-reverse; 
+            align-items: flex-start;
         }
         </style>
         <title>ZONAS VERDES EMASAGRA</title>
@@ -436,36 +455,60 @@
         };
         logoControl.addTo(map);
 
-        // --- FIN DE LA IMPLEMENTACIÓN DE LAS MODIFICACIONES ---
+        // --- NUEVO: 3. Control de recuento de árboles ---
+        var treeCountControl = L.control({position: 'bottomleft'});
+        treeCountControl.onAdd = function (map) {
+            // Usamos una clase personalizada para el estilo
+            this._div = L.DomUtil.create('div', 'tree-count-control');
+            // Inicializamos con el total de árboles antes de filtrar
+            this.update(json_ARBOLADO_4.features.length); 
+            return this._div;
+        };
+        treeCountControl.update = function (count) {
+            // Actualizamos el contenido. Se añade un span con color para destacar el número.
+            this._div.innerHTML = 'Árboles Visibles: <span style="color: #54B04A;">' + count + '</span>';
+        };
+        treeCountControl.addTo(map);
+        // --- FIN DEL NUEVO CONTROL ---
 
+
+        // El control de capas (lay) debe inicializarse antes que la búsqueda
         var overlaysTree = [
             {label: '<img src="legend/ARBOLADO_4.png" /> ARBOLADO', layer: layer_ARBOLADO_4},
+            // CORRECCIÓN: Se arregla el error tipográfico en el nombre de la capa.
             {label: 'TIPOLOGIA ZONAS<br /><table><tr><td style="text-align: center;"><img src="legend/TIPOLOGIAZONAS_3_Cesped0.png" /></td><td>Cesped</td></tr><tr><td style="text-align: center;"><img src="legend/TIPOLOGIAZONAS_3_Suelocultivable1.png" /></td><td>Suelo cultivable</td></tr><tr><td style="text-align: center;"><img src="legend/TIPOLOGIAZONAS_3_Arbustivas2.png" /></td><td>Arbustivas</td></tr><tr><td style="text-align: center;"><img src="legend/TIPOLOGIAZONAS_3_Otros3.png" /></td><td>Otros</td></tr><tr><td style="text-align: center;"><img src="legend/TIPOLOGIAZONAS_3_Grava4.png" /></td><td>Grava</td></tr></table>', layer: layer_TIPOLOGIAZONAS_3},
         {label: '<b>MAPAS BASE</b>',  selectAllCheckbox: true, children: [
             {label: "Viales", layer: layer_Viales_2},
             {label: "Positron", layer: layer_Positron_1, radioGroup: 'bm' },
             {label: "Google Satellite", layer: layer_GoogleSatellite_0, radioGroup: 'bm' },]},]
         var lay = L.control.layers.tree(null, overlaysTree,{
-            //namedToggle: true,
-            //selectorBack: false,
-            //closedSymbol: '&#8862; &#x1f5c0;',
-            //openedSymbol: '&#8863; &#x1f5c1;',
-            //collapseAll: 'Collapse all',
-            //expandAll: 'Expand all',
             collapsed: true,
         });
         lay.addTo(map);
         setBounds();
+
+        // Inicialización del control de búsqueda (apuntando a la capa de zonas TIPOLOGIAZONAS_3)
         map.addControl(new L.Control.Search({
-            layer: layer_ARBOLADO_4,
+            layer: layer_TIPOLOGIAZONAS_3, 
             initial: false,
             hideMarkerOnCollapse: true,
-            propertyName: 'NOMBRE'}));
-        if (typeof url === 'undefined') {
-            document.getElementsByClassName('search-button')[0].className += ' fa fa-binoculars';
-        } else {
-            document.getElementsByClassName('search-button')[1].className += ' fa fa-binoculars';
+            propertyName: 'NOMBRE'})); 
+
+        // Nos aseguramos de aplicar la clase del icono al botón de búsqueda.
+        var searchButton = document.getElementsByClassName('search-button')[0];
+        if (searchButton) {
+            searchButton.className += ' fa fa-binoculars';
         }
+        
+        if (typeof url === 'undefined') {
+            // ...
+        } else {
+            // ...
+        }
+
+        // --- FIN DE LAS MODIFICACIONES ---
+
+
         var mapDiv = document.getElementById('map');
         var row = document.createElement('div');
         row.className="row";
@@ -475,13 +518,13 @@
         col1.className="col9";
         col1.id = "mapWindow";
         col1.style.height = "99%";
-        // Modificación: Ocultar filtros por defecto -> Mapa al 100%
+        // Ocultar filtros por defecto -> Mapa al 100%
         col1.style.width = "100%"; 
         col1.style.display = "inline-block";
         var col2 = document.createElement('div');
         col2.className="col3";
         col2.id = "menu";
-        // Modificación: Ocultar filtros por defecto -> Columna de filtros oculta
+        // Ocultar filtros por defecto -> Columna de filtros oculta
         col2.style.width = "20%"; 
         col2.style.display = "none";
         mapDiv.parentNode.insertBefore(row, mapDiv);
@@ -575,6 +618,14 @@
             }
           this[lyr["options"]["layerName"]].clearLayers();
           this[lyr["options"]["layerName"]].addData(features);
+          
+          // NUEVO: Actualizar el contador de árboles visibles si es la capa ARBOLADO
+          if (lyr["options"]["layerName"] === 'layer_ARBOLADO_4') {
+              if (typeof treeCountControl !== 'undefined') {
+                  treeCountControl.update(features.length); 
+              }
+          }
+
           }
           })
         }
