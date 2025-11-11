@@ -1,0 +1,785 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="initial-scale=1,user-scalable=no,maximum-scale=1,width=device-width">
+        <meta name="mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <link rel="stylesheet" href="css/leaflet.css">
+        <link rel="stylesheet" href="css/L.Control.Layers.Tree.css">
+        <link rel="stylesheet" href="css/L.Control.Locate.min.css">
+        <link rel="stylesheet" href="css/qgis2web.css">
+        <link rel="stylesheet" href="css/fontawesome-all.min.css">
+        <link rel="stylesheet" href="css/leaflet-search.css">
+        <link rel="stylesheet" href="css/filter.css">
+<link rel="stylesheet" href="css/nouislider.min.css">
+        <link rel="stylesheet" href="css/leaflet.photon.css">
+        <link rel="stylesheet" href="css/leaflet-measure.css">
+        <style>
+        html, body, #map {
+            width: 100%;
+            height: 100%;
+            padding: 0;
+            margin: 0;
+        }
+        /* Estilos para el logo (Modificación 2) */
+        .logo-control {
+            /* Quitar fondo, sombra y borde */
+            background: none;
+            border: none;
+            box-shadow: none;
+            padding: 0;
+        }
+        .logo-control img {
+            width: 170px; /* 100px*/
+            height: auto;
+            display: block;
+        }
+        /* Estilos para el botón de filtros (Modificación 1) */
+        .filter-text-button {
+            /* Estilo para que parezca un botón de control de Leaflet */
+            background-color: #fff;
+            border: 2px solid rgba(0,0,0,0.2);
+            background-clip: padding-box;
+            border-radius: 3px;
+            cursor: pointer;
+            text-align: center;
+            height: 30px; 
+            line-height: 26px;
+            padding: 0 8px;
+            font-weight: bold;
+            color: #333;
+            box-shadow: 0 1px 5px rgba(0,0,0,0.65);
+            margin-top: 5px; /* Pequeño margen para separarlo del control de capas */
+        }
+        </style>
+        <title>ZONAS VERDES EMASAGRA</title>
+    </head>
+    <body>
+        <div id="map">
+        </div>
+        <script src="js/qgis2web_expressions.js"></script>
+        <script src="js/leaflet.js"></script>
+        <script src="js/L.Control.Layers.Tree.min.js"></script>
+        <script src="js/L.Control.Locate.min.js"></script>
+        <script src="js/leaflet.rotatedMarker.js"></script>
+        <script src="js/leaflet.pattern.js"></script>
+        <script src="js/leaflet-hash.js"></script>
+        <script src="js/Autolinker.min.js"></script>
+        <script src="js/rbush.min.js"></script>
+        <script src="js/labelgun.min.js"></script>
+        <script src="js/labels.js"></script>
+        <script src="js/leaflet.wms.js"></script>
+        <script src="js/leaflet.photon.js"></script>
+        <script src="js/leaflet-measure.js"></script>
+        <script src="js/leaflet-search.js"></script>
+        <script src="js/tailDT.js"></script>
+<script src="js/nouislider.min.js"></script>
+<script src="js/wNumb.js"></script>
+        <script src="data/TIPOLOGIAZONAS_3.js"></script>
+        <script src="data/ARBOLADO_4.js"></script>
+        <script>
+        var map = L.map('map', {
+            zoomControl:false, maxZoom:28, minZoom:1
+        }).fitBounds([[37.16491859662608,-3.564197586571517],[37.167968836117716,-3.558537385722101]]);
+        var hash = new L.Hash(map);
+        map.attributionControl.setPrefix('<a href="https://github.com/tomchadwin/qgis2web" target="_blank">qgis2web</a> &middot; <a href="https://leafletjs.com" title="A JS library for interactive maps">Leaflet</a> &middot; <a href="https://qgis.org">QGIS</a>');
+        var autolinker = new Autolinker({truncate: {length: 30, location: 'smart'}});
+        // remove popup's row if "visible-with-data"
+        function removeEmptyRowsFromPopupContent(content, feature) {
+         var tempDiv = document.createElement('div');
+         tempDiv.innerHTML = content;
+         var rows = tempDiv.querySelectorAll('tr');
+         for (var i = 0; i < rows.length; i++) {
+             var td = rows[i].querySelector('td.visible-with-data');
+             var key = td ? td.id : '';
+             if (td && td.classList.contains('visible-with-data') && feature.properties[key] == null) {
+                 rows[i].parentNode.removeChild(rows[i]);
+             }
+         }
+         return tempDiv.innerHTML;
+        }
+        // modify popup if contains media
+        function addClassToPopupIfMedia(content, popup) {
+            var tempDiv = document.createElement('div');
+            tempDiv.innerHTML = content;
+            var imgTd = tempDiv.querySelector('td img');
+            if (imgTd) {
+                var src = imgTd.getAttribute('src');
+                if (/\.(jpg|jpeg|png|gif|bmp|webp|avif)$/i.test(src)) {
+                    popup._contentNode.classList.add('media');
+                    setTimeout(function() {
+                        popup.update();
+                    }, 10);
+                } else if (/\.(mp3|wav|ogg|aac)$/i.test(src)) {
+                    var audio = document.createElement('audio');
+                    audio.controls = true;
+                    audio.src = src;
+                    imgTd.parentNode.replaceChild(audio, imgTd);
+                    popup._contentNode.classList.add('media');
+                    setTimeout(function() {
+                        popup.setContent(tempDiv.innerHTML);
+                        popup.update();
+                    }, 10);
+                } else if (/\.(mp4|webm|ogg|mov)$/i.test(src)) {
+                    var video = document.createElement('video');
+                    video.controls = true;
+                    video.src = src;
+                    video.style.width = "400px";
+                    video.style.height = "300px";
+                    video.style.maxHeight = "60vh";
+                    video.style.maxWidth = "60vw";
+                    imgTd.parentNode.replaceChild(video, imgTd);
+                    popup._contentNode.classList.add('media');
+                    // Aggiorna il popup quando il video carica i metadati
+                    video.addEventListener('loadedmetadata', function() {
+                        popup.update();
+                    });
+                    setTimeout(function() {
+                        popup.setContent(tempDiv.innerHTML);
+                        popup.update();
+                    }, 10);
+                } else {
+                    popup._contentNode.classList.remove('media');
+                }
+            } else {
+                popup._contentNode.classList.remove('media');
+            }
+        }
+        var title = new L.Control({'position':'topright'});
+        title.onAdd = function (map) {
+            this._div = L.DomUtil.create('div', 'info');
+            this.update();
+            return this._div;
+        };
+        title.update = function () {
+            this._div.innerHTML = '<h2>ZONAS VERDES EMASAGRA</h2>';
+        };
+        title.addTo(map);
+        var zoomControl = L.control.zoom({
+            position: 'topleft'
+        }).addTo(map);
+        L.control.locate({locateOptions: {maxZoom: 19}}).addTo(map);
+        var measureControl = new L.Control.Measure({
+            position: 'topleft',
+            primaryLengthUnit: 'meters',
+            secondaryLengthUnit: 'kilometers',
+            primaryAreaUnit: 'sqmeters',
+            secondaryAreaUnit: 'hectares'
+        });
+        measureControl.addTo(map);
+        document.getElementsByClassName('leaflet-control-measure-toggle')[0].innerHTML = '';
+        document.getElementsByClassName('leaflet-control-measure-toggle')[0].className += ' fas fa-ruler';
+        var bounds_group = new L.featureGroup([]);
+        function setBounds() {
+        }
+        map.createPane('pane_GoogleSatellite_0');
+        map.getPane('pane_GoogleSatellite_0').style.zIndex = 400;
+        var layer_GoogleSatellite_0 = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+            pane: 'pane_GoogleSatellite_0',
+            opacity: 0.8,
+            attribution: '<a href="https://www.google.at/permissions/geoguidelines/attr-guide.html">Map data ©2015 Google</a>',
+            minZoom: 1,
+            maxZoom: 28,
+            minNativeZoom: 0,
+            maxNativeZoom: 20
+        });
+        layer_GoogleSatellite_0;
+        map.addLayer(layer_GoogleSatellite_0);
+        map.createPane('pane_Positron_1');
+        map.getPane('pane_Positron_1').style.zIndex = 401;
+        var layer_Positron_1 = L.tileLayer('https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png', {
+            pane: 'pane_Positron_1',
+            opacity: 1.0,
+            attribution: '<a href="https://cartodb.com/basemaps/">Map tiles by CartoDB, under CC BY 3.0. Data by OpenStreetMap, under ODbL.</a>',
+            minZoom: 1,
+            maxZoom: 28,
+            minNativeZoom: 0,
+            maxNativeZoom: 20
+        });
+        layer_Positron_1;
+        map.createPane('pane_Viales_2');
+        map.getPane('pane_Viales_2').style.zIndex = 402;
+        var layer_Viales_2 = L.WMS.layer("http://www.callejerodeandalucia.es/servicios/cdau/wms", "v_vial", {
+            pane: 'pane_Viales_2',
+            format: 'image/png',
+            uppercase: true,
+            transparent: true,
+            continuousWorld : true,
+            tiled: true,
+            info_format: 'text/html',
+            opacity: 1,
+            identify: false,
+            attribution: '',
+        });
+        map.addLayer(layer_Viales_2);
+        function pop_TIPOLOGIAZONAS_3(feature, layer) {
+            var popupContent = '<table>\
+                    <tr>\
+                        <th scope="row">NOMBRE</th>\
+                        <td class="visible-with-data" id="NOMBRE">' + (feature.properties['NOMBRE'] !== null ? autolinker.link(String(feature.properties['NOMBRE']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">LOTE</th>\
+                        <td class="visible-with-data" id="LOTE">' + (feature.properties['LOTE'] !== null ? autolinker.link(String(feature.properties['LOTE']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">AREA</th>\
+                        <td class="visible-with-data" id="AREA">' + (feature.properties['AREA'] !== null ? autolinker.link(String(feature.properties['AREA']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">TIPOLOGIA</th>\
+                        <td class="visible-with-data" id="TIPOLOGIA">' + (feature.properties['TIPOLOGIA'] !== null ? autolinker.link(String(feature.properties['TIPOLOGIA']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_TIPOLOGIAZONAS_3_0(feature) {
+            switch(String(feature.properties['TIPOLOGIA'])) {
+                case 'Cesped':
+                    return {
+                pane: 'pane_TIPOLOGIAZONAS_3',
+                opacity: 1,
+                color: 'rgba(35,35,35,0.456)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(28,161,53,0.456)',
+                interactive: true,
+            }
+                    break;
+                case 'Jardin':
+                    return {
+                pane: 'pane_TIPOLOGIAZONAS_3',
+                opacity: 1,
+                color: 'rgba(35,35,35,0.456)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(118,79,7,0.456)',
+                interactive: true,
+            }
+                    break;
+                case 'Arbustivas':
+                    return {
+                pane: 'pane_TIPOLOGIAZONAS_3',
+                opacity: 1,
+                color: 'rgba(35,35,35,0.456)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(207,93,79,0.456)',
+                interactive: true,
+            }
+                    break;
+                default:
+                    return {
+                pane: 'pane_TIPOLOGIAZONAS_3',
+                opacity: 1,
+                color: 'rgba(35,35,35,0.456)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(37,37,37,0.2020705882352941)',
+                interactive: true,
+            }
+                    break;
+                case 'Chino':
+                    return {
+                pane: 'pane_TIPOLOGIAZONAS_3',
+                opacity: 1,
+                color: 'rgba(35,35,35,0.456)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(215,215,215,0.2610823529411765)',
+                interactive: true,
+            }
+                    break;
+            }
+        }
+        map.createPane('pane_TIPOLOGIAZONAS_3');
+        map.getPane('pane_TIPOLOGIAZONAS_3').style.zIndex = 403;
+        map.getPane('pane_TIPOLOGIAZONAS_3').style['mix-blend-mode'] = 'normal';
+        var layer_TIPOLOGIAZONAS_3 = new L.geoJson(json_TIPOLOGIAZONAS_3, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_TIPOLOGIAZONAS_3',
+            layerName: 'layer_TIPOLOGIAZONAS_3',
+            pane: 'pane_TIPOLOGIAZONAS_3',
+            onEachFeature: pop_TIPOLOGIAZONAS_3,
+            style: style_TIPOLOGIAZONAS_3_0,
+        });
+        bounds_group.addLayer(layer_TIPOLOGIAZONAS_3);
+        map.addLayer(layer_TIPOLOGIAZONAS_3);
+        function pop_ARBOLADO_4(feature, layer) {
+            var popupContent = '<table>\
+                    <tr>\
+                        <th scope="row">ESPECIE</th>\
+                        <td class="visible-with-data" id="ESPECIE">' + (feature.properties['ESPECIE'] !== null ? autolinker.link(String(feature.properties['ESPECIE']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">DIAME_COPA</th>\
+                        <td class="visible-with-data" id="DIAME_COPA">' + (feature.properties['DIAME_COPA'] !== null ? autolinker.link(String(feature.properties['DIAME_COPA']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">NOMBRE</th>\
+                        <td class="visible-with-data" id="NOMBRE">' + (feature.properties['NOMBRE'] !== null ? autolinker.link(String(feature.properties['NOMBRE']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <th scope="row">LOTE</th>\
+                        <td class="visible-with-data" id="LOTE">' + (feature.properties['LOTE'] !== null ? autolinker.link(String(feature.properties['LOTE']).replace(/'/g, '\'').toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_ARBOLADO_4_0() {
+            return {
+                pane: 'pane_ARBOLADO_4',
+                radius: 5.0,
+                opacity: 1,
+                color: 'rgba(255,255,255,0.6759999999999999)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0,
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(84,176,74,0.6759999999999999)',
+                interactive: true,
+            }
+        }
+        map.createPane('pane_ARBOLADO_4');
+        map.getPane('pane_ARBOLADO_4').style.zIndex = 404;
+        map.getPane('pane_ARBOLADO_4').style['mix-blend-mode'] = 'normal';
+        var layer_ARBOLADO_4 = new L.geoJson(json_ARBOLADO_4, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_ARBOLADO_4',
+            layerName: 'layer_ARBOLADO_4',
+            pane: 'pane_ARBOLADO_4',
+            onEachFeature: pop_ARBOLADO_4,
+            pointToLayer: function (feature, latlng) {
+                var context = {
+                    feature: feature,
+                    variables: {}
+                };
+                return L.circleMarker(latlng, style_ARBOLADO_4_0(feature));
+            },
+        });
+        bounds_group.addLayer(layer_ARBOLADO_4);
+        map.addLayer(layer_ARBOLADO_4);
+
+        // --- INICIO DE LA IMPLEMENTACIÓN DE LAS MODIFICACIONES ---
+
+        // 1. Botón de filtros con texto "Mostrar/Ocultar filtros" en posición topright
+        var filterButton = L.control({position: 'topright'});
+        filterButton.onAdd = function (map) {
+            // Usamos un div con la clase personalizada 'filter-text-button'
+            var div = L.DomUtil.create('div', 'filter-text-button');
+            div.innerHTML = 'Mostrar/Ocultar filtros';
+            
+            // Lógica para alternar la visibilidad
+            L.DomEvent.on(div, 'click', function() {
+                var menu = document.getElementById('menu');
+                var mapWindow = document.getElementById('mapWindow');
+                if (menu.style.display === 'none' || menu.style.display === '') {
+                    // Mostrar filtros
+                    menu.style.display = 'inline-block';
+                    menu.style.width = '20%'; // Ancho de la columna de filtros
+                    mapWindow.style.width = '80%'; // Ancho del mapa
+                } else {
+                    // Ocultar filtros
+                    menu.style.display = 'none';
+                    mapWindow.style.width = '100%'; // Maximizar mapa
+                }
+                map.invalidateSize(); // Recalcula el tamaño del mapa
+            });
+            L.DomEvent.disableClickPropagation(div);
+            return div;
+        };
+        filterButton.addTo(map);
+
+        // 2. Logo en la esquina inferior izquierda (sin fondo y 10% más grande)
+        var logoControl = L.control({position: 'bottomleft'});
+        logoControl.onAdd = function(map) {
+            // La clase 'logo-control' aplica los estilos de transparencia y tamaño
+            var div = L.DomUtil.create('div', 'logo-control');
+            div.innerHTML = '<img src="images/logo.png" alt="Logo">';
+            return div;
+        };
+        logoControl.addTo(map);
+
+        // --- FIN DE LA IMPLEMENTACIÓN DE LAS MODIFICACIONES ---
+
+        var overlaysTree = [
+            {label: '<img src="legend/ARBOLADO_4.png" /> ARBOLADO', layer: layer_ARBOLADO_4},
+            {label: 'TIPOLOGIA ZONAS<br /><table><tr><td style="text-align: center;"><img src="legend/TIPOLOGIAZONAS_3_Cesped0.png" /></td><td>Cesped</td></tr><tr><td style="text-align: center;"><img src="legend/TIPOLOGIAZONAS_3_Suelocultivable1.png" /></td><td>Suelo cultivable</td></tr><tr><td style="text-align: center;"><img src="legend/TIPOLOGIAZONAS_3_Arbustivas2.png" /></td><td>Arbustivas</td></tr><tr><td style="text-align: center;"><img src="legend/TIPOLOGIAZONAS_3_Otros3.png" /></td><td>Otros</td></tr><tr><td style="text-align: center;"><img src="legend/TIPOLOGIAZONAS_3_Grava4.png" /></td><td>Grava</td></tr></table>', layer: layer_TIPOLOGIAZONAS_3},
+        {label: '<b>MAPAS BASE</b>',  selectAllCheckbox: true, children: [
+            {label: "Viales", layer: layer_Viales_2},
+            {label: "Positron", layer: layer_Positron_1, radioGroup: 'bm' },
+            {label: "Google Satellite", layer: layer_GoogleSatellite_0, radioGroup: 'bm' },]},]
+        var lay = L.control.layers.tree(null, overlaysTree,{
+            //namedToggle: true,
+            //selectorBack: false,
+            //closedSymbol: '&#8862; &#x1f5c0;',
+            //openedSymbol: '&#8863; &#x1f5c1;',
+            //collapseAll: 'Collapse all',
+            //expandAll: 'Expand all',
+            collapsed: true,
+        });
+        lay.addTo(map);
+        setBounds();
+        map.addControl(new L.Control.Search({
+            layer: layer_ARBOLADO_4,
+            initial: false,
+            hideMarkerOnCollapse: true,
+            propertyName: 'NOMBRE'}));
+        if (typeof url === 'undefined') {
+            document.getElementsByClassName('search-button')[0].className += ' fa fa-binoculars';
+        } else {
+            document.getElementsByClassName('search-button')[1].className += ' fa fa-binoculars';
+        }
+        var mapDiv = document.getElementById('map');
+        var row = document.createElement('div');
+        row.className="row";
+        row.id="all";
+        row.style.height = "100%";
+        var col1 = document.createElement('div');
+        col1.className="col9";
+        col1.id = "mapWindow";
+        col1.style.height = "99%";
+        // Modificación: Ocultar filtros por defecto -> Mapa al 100%
+        col1.style.width = "100%"; 
+        col1.style.display = "inline-block";
+        var col2 = document.createElement('div');
+        col2.className="col3";
+        col2.id = "menu";
+        // Modificación: Ocultar filtros por defecto -> Columna de filtros oculta
+        col2.style.width = "20%"; 
+        col2.style.display = "none";
+        mapDiv.parentNode.insertBefore(row, mapDiv);
+        document.getElementById("all").appendChild(col1);
+        document.getElementById("all").appendChild(col2);
+        col1.appendChild(mapDiv)
+        var Filters = {"LOTE": "int","NOMBRE": "str"};
+        function filterFunc() {
+          map.eachLayer(function(lyr){
+          if ("options" in lyr && "dataVar" in lyr["options"]){
+            features = this[lyr["options"]["dataVar"]].features.slice(0);
+            try{
+              for (key in Filters){
+                keyS = key.replace(/[^a-zA-Z0-9_]/g, "")
+                if (Filters[key] == "str" || Filters[key] == "bool"){
+                  var selection = [];
+                  var options = document.getElementById("sel_" + keyS).options
+                  for (var i=0; i < options.length; i++) {
+                    if (options[i].selected) selection.push(options[i].value);
+                  }
+                    try{
+                      if (key in features[0].properties){
+                        for (i = features.length - 1;
+                          i >= 0; --i){
+                          if (selection.indexOf(
+                          features[i].properties[key])<0
+                          && selection.length>0) {
+                          features.splice(i,1);
+                          }
+                        }
+                      }
+                    } catch(err){
+                  }
+                }
+                if (Filters[key] == "int"){
+                  sliderVals =  document.getElementById(
+                    "div_" + keyS).noUiSlider.get();
+                  try{
+                    if (key in features[0].properties){
+                    for (i = features.length - 1; i >= 0; --i){
+                      if (parseInt(features[i].properties[key])
+                          < sliderVals[0]
+                          || parseInt(features[i].properties[key])
+                          > sliderVals[1]){
+                            features.splice(i,1);
+                          }
+                        }
+                      }
+                    } catch(err){
+                    }
+                  }
+                if (Filters[key] == "real"){
+                  sliderVals =  document.getElementById(
+                    "div_" + keyS).noUiSlider.get();
+                  try{
+                    if (key in features[0].properties){
+                    for (i = features.length - 1; i >= 0; --i){
+                      if (features[i].properties[key]
+                          < sliderVals[0]
+                          || features[i].properties[key]
+                          > sliderVals[1]){
+                            features.splice(i,1);
+                          }
+                        }
+                      }
+                    } catch(err){
+                    }
+                  }
+                if (Filters[key] == "date"
+                  || Filters[key] == "datetime"
+                  || Filters[key] == "time"){
+                  try{
+                    if (key in features[0].properties){
+                      HTMLkey = key.replace(/[&\/\\#,+()$~%.'":*?<>{} ]/g, '');
+                      startdate = document.getElementById("dat_" +
+                        HTMLkey + "_date1").value.replace(" ", "T");
+                      enddate = document.getElementById("dat_" +
+                        HTMLkey + "_date2").value.replace(" ", "T");
+                      for (i = features.length - 1; i >= 0; --i){
+                        if (features[i].properties[key] < startdate
+                          || features[i].properties[key] > enddate){
+                          features.splice(i,1);
+                        }
+                      }
+                    }
+                  } catch(err){
+                  }
+                }
+              }
+            } catch(err){
+            }
+          this[lyr["options"]["layerName"]].clearLayers();
+          this[lyr["options"]["layerName"]].addData(features);
+          }
+          })
+        }
+            document.getElementById("menu").appendChild(
+                document.createElement("div"));
+            var div_LOTE = document.createElement("div");
+            div_LOTE.id = "div_LOTE";
+            div_LOTE.className = "slider";
+            document.getElementById("menu").appendChild(div_LOTE);
+            var lab_LOTE = document.createElement('div');
+            lab_LOTE.innerHTML  = 'LOTE: <span id="val_LOTE"></span>';
+            lab_LOTE.className = 'filterlabel';
+            document.getElementById("menu").appendChild(lab_LOTE);
+            var reset_LOTE = document.createElement('div');
+            reset_LOTE.innerHTML = 'clear filter';
+            reset_LOTE.className = 'filterlabel';
+            lab_LOTE.className = 'filterlabel';
+            reset_LOTE.onclick = function() {
+                sel_LOTE.noUiSlider.reset();
+            };
+            document.getElementById("menu").appendChild(reset_LOTE);
+            var sel_LOTE = document.getElementById('div_LOTE');
+            noUiSlider.create(sel_LOTE, {
+                connect: true,
+                start: [1, 3],
+                step: 1,
+                format: wNumb({
+                    decimals: 0,
+                    }),
+                range: {
+                min: 1,
+                max: 3
+                }
+            });
+            sel_LOTE.noUiSlider.on('update', function (values) {
+            filterVals =[];
+            for (value in values){
+            filterVals.push(parseInt(value))
+            }
+            val_LOTE = document.getElementById('val_LOTE');
+            val_LOTE.innerHTML = values.join(' - ');
+                filterFunc()
+            });
+            document.getElementById("menu").appendChild(
+                document.createElement("div"));
+            var div_NOMBRE = document.createElement('div');
+            div_NOMBRE.id = "div_NOMBRE";
+            div_NOMBRE.className= "filterselect";
+            document.getElementById("menu").appendChild(div_NOMBRE);
+            sel_NOMBRE = document.createElement('select');
+            sel_NOMBRE.multiple = true;
+            sel_NOMBRE.size = 10;
+            sel_NOMBRE.id = "sel_NOMBRE";
+            var NOMBRE_options_str = "<option value='' unselected></option>";
+            sel_NOMBRE.onchange = function(){filterFunc()};
+            NOMBRE_options_str  += '<option value="ALHENDIN - DEPOSITO EL ARENAL">ALHENDIN - DEPOSITO EL ARENAL</option>';
+            NOMBRE_options_str  += '<option value="ALHENDIN - DEPOSITO LA QUINTA">ALHENDIN - DEPOSITO LA QUINTA</option>';
+            NOMBRE_options_str  += '<option value="ALHENDIN - DEPOSITO LOS LLANOS">ALHENDIN - DEPOSITO LOS LLANOS</option>';
+            NOMBRE_options_str  += '<option value="ALHENDIN - DEPOSITO SECANILLO">ALHENDIN - DEPOSITO SECANILLO</option>';
+            NOMBRE_options_str  += '<option value="ALHENDIN - DEPOSITOS GENERALES ELEVADO">ALHENDIN - DEPOSITOS GENERALES ELEVADO</option>';
+            NOMBRE_options_str  += '<option value="ALHENDIN - POZO ALJANCIRA">ALHENDIN - POZO ALJANCIRA</option>';
+            NOMBRE_options_str  += '<option value="ALHENDIN - POZO DEL SECANILLO">ALHENDIN - POZO DEL SECANILLO</option>';
+            NOMBRE_options_str  += '<option value="ARMILLA - DEPOSITO GENERALES">ARMILLA - DEPOSITO GENERALES</option>';
+            NOMBRE_options_str  += '<option value="BIOFACTORIA SUR">BIOFACTORIA SUR</option>';
+            NOMBRE_options_str  += '<option value="CAJAR - DEPOSITO CONSULTORIO">CAJAR - DEPOSITO CONSULTORIO</option>';
+            NOMBRE_options_str  += '<option value="CAJAR - DEPOSITO DEL CEMENTERIO">CAJAR - DEPOSITO DEL CEMENTERIO</option>';
+            NOMBRE_options_str  += '<option value="CAJAR - DEPOSITO EXTRARRADIO">CAJAR - DEPOSITO EXTRARRADIO</option>';
+            NOMBRE_options_str  += '<option value="CAJAR - DEPOSITO VAQUERIA">CAJAR - DEPOSITO VAQUERIA</option>';
+            NOMBRE_options_str  += '<option value="CAJAR - POZO EXTRARRADIO">CAJAR - POZO EXTRARRADIO</option>';
+            NOMBRE_options_str  += '<option value="CAJAR - TOMA DE CAJAR">CAJAR - TOMA DE CAJAR</option>';
+            NOMBRE_options_str  += '<option value="CENES DE LA VEGA - DEPOSITO AVILA ROJAS (CERRO DEL SOL)">CENES DE LA VEGA - DEPOSITO AVILA ROJAS (CERRO DEL SOL)</option>';
+            NOMBRE_options_str  += '<option value="CENES DE LA VEGA - DEPOSITO CERRO DEL ORO">CENES DE LA VEGA - DEPOSITO CERRO DEL ORO</option>';
+            NOMBRE_options_str  += '<option value="CENES DE LA VEGA - DEPOSITO LOS POLOS">CENES DE LA VEGA - DEPOSITO LOS POLOS</option>';
+            NOMBRE_options_str  += '<option value="CENES DE LA VEGA - DEPOSITO VISTA BLANCA">CENES DE LA VEGA - DEPOSITO VISTA BLANCA</option>';
+            NOMBRE_options_str  += '<option value="CHURRIANA DE LA VEGA - CH001 DEPOSITOS GENERALES">CHURRIANA DE LA VEGA - CH001 DEPOSITOS GENERALES</option>';
+            NOMBRE_options_str  += '<option value="CULLAR VEGA - CAMARA DE REDUCTORAS">CULLAR VEGA - CAMARA DE REDUCTORAS</option>';
+            NOMBRE_options_str  += '<option value="CULLAR VEGA - DEPOSITO LA GLORIA (VIEJO)">CULLAR VEGA - DEPOSITO LA GLORIA (VIEJO)</option>';
+            NOMBRE_options_str  += '<option value="CULLAR VEGA - DEPOSITO NUEVO LA GLORIA">CULLAR VEGA - DEPOSITO NUEVO LA GLORIA</option>';
+            NOMBRE_options_str  += '<option value="CULLAR VEGA - DEPOSITO VENTORRILLO">CULLAR VEGA - DEPOSITO VENTORRILLO</option>';
+            NOMBRE_options_str  += '<option value="CULLAR VEGA - POZO DE LA GLORIA">CULLAR VEGA - POZO DE LA GLORIA</option>';
+            NOMBRE_options_str  += '<option value="CULLAR VEGA - REBOMBEO VENTORRILLO">CULLAR VEGA - REBOMBEO VENTORRILLO</option>';
+            NOMBRE_options_str  += '<option value="DEPOSITO DE LOAYSA">DEPOSITO DE LOAYSA</option>';
+            NOMBRE_options_str  += '<option value="DEPOSITO DE PARQUE NUEVA GRANADA">DEPOSITO DE PARQUE NUEVA GRANADA</option>';
+            NOMBRE_options_str  += '<option value="EDAR VADOS">EDAR VADOS</option>';
+            NOMBRE_options_str  += '<option value="ETAP ESPACIO DINAPSIS">ETAP ESPACIO DINAPSIS</option>';
+            NOMBRE_options_str  += '<option value="ETAP LANCHA DEL GENIL">ETAP LANCHA DEL GENIL</option>';
+            NOMBRE_options_str  += '<option value="GOJAR - DEPOSITO CEREZOS 4ª Y 5ª FASE">GOJAR - DEPOSITO CEREZOS 4ª Y 5ª FASE</option>';
+            NOMBRE_options_str  += '<option value="GOJAR - DEPOSITO COLLADO ALTO">GOJAR - DEPOSITO COLLADO ALTO</option>';
+            NOMBRE_options_str  += '<option value="GOJAR - DEPOSITO COLLADO BAJO">GOJAR - DEPOSITO COLLADO BAJO</option>';
+            NOMBRE_options_str  += '<option value="GOJAR - DEPOSITO ERMITA">GOJAR - DEPOSITO ERMITA</option>';
+            NOMBRE_options_str  += '<option value="GOJAR - DEPOSITO MONTERROSAS">GOJAR - DEPOSITO MONTERROSAS</option>';
+            NOMBRE_options_str  += '<option value="GOJAR - DEPOSITO PORTICHUELO">GOJAR - DEPOSITO PORTICHUELO</option>';
+            NOMBRE_options_str  += '<option value="GOJAR - DEPOSITO SANTA MARTA">GOJAR - DEPOSITO SANTA MARTA</option>';
+            NOMBRE_options_str  += '<option value="GOJAR - POZO AMPUERO">GOJAR - POZO AMPUERO</option>';
+            NOMBRE_options_str  += '<option value="GOJAR - POZO COLLADO ALTO">GOJAR - POZO COLLADO ALTO</option>';
+            NOMBRE_options_str  += '<option value="GRANADA - DEPOSITO BOLA DE ORO">GRANADA - DEPOSITO BOLA DE ORO</option>';
+            NOMBRE_options_str  += '<option value="GRANADA - DEPOSITO CONEJERAS">GRANADA - DEPOSITO CONEJERAS</option>';
+            NOMBRE_options_str  += '<option value="GRANADA - DEPOSITO DE CARTUJA 1 Y 2">GRANADA - DEPOSITO DE CARTUJA 1 Y 2</option>';
+            NOMBRE_options_str  += '<option value="GRANADA - DEPOSITO DE CARTUJA 3 Y 4">GRANADA - DEPOSITO DE CARTUJA 3 Y 4</option>';
+            NOMBRE_options_str  += '<option value="GRANADA - DEPOSITO FARGUE">GRANADA - DEPOSITO FARGUE</option>';
+            NOMBRE_options_str  += '<option value="GRANADA - DEPOSITO MARTIRES 1 Y 2">GRANADA - DEPOSITO MARTIRES 1 Y 2</option>';
+            NOMBRE_options_str  += '<option value="GRANADA - DEPOSITO NUEVO SAN MIGUEL">GRANADA - DEPOSITO NUEVO SAN MIGUEL</option>';
+            NOMBRE_options_str  += '<option value="GRANADA - DEPOSITO SAN MIGUEL">GRANADA - DEPOSITO SAN MIGUEL</option>';
+            NOMBRE_options_str  += '<option value="GRANADA - PARC. NUEVA SEDE EMASAGRA CTRA JAEN">GRANADA - PARC. NUEVA SEDE EMASAGRA CTRA JAEN</option>';
+            NOMBRE_options_str  += '<option value="GRANADA - SECTOR 3 GRANADA CRTA DE LA SIERRA">GRANADA - SECTOR 3 GRANADA CRTA DE LA SIERRA</option>';
+            NOMBRE_options_str  += '<option value="HUETOR VEGA - DEPOSITO CUARTILLOS">HUETOR VEGA - DEPOSITO CUARTILLOS</option>';
+            NOMBRE_options_str  += '<option value="HUETOR VEGA - DEPOSITO MONTEVELEZ">HUETOR VEGA - DEPOSITO MONTEVELEZ</option>';
+            NOMBRE_options_str  += '<option value="HUETOR VEGA - DEPOSITO NEVEROS">HUETOR VEGA - DEPOSITO NEVEROS</option>';
+            NOMBRE_options_str  += '<option value="HUETOR VEGA - DEPOSITO PERDICES">HUETOR VEGA - DEPOSITO PERDICES</option>';
+            NOMBRE_options_str  += '<option value="HUETOR VEGA - POZO Y DEPOSITO CAÑADILLA">HUETOR VEGA - POZO Y DEPOSITO CAÑADILLA</option>';
+            NOMBRE_options_str  += '<option value="LA ZUBIA - DEPOSITO 2000">LA ZUBIA - DEPOSITO 2000</option>';
+            NOMBRE_options_str  += '<option value="LA ZUBIA - DEPOSITO CANTINA DE RUTE">LA ZUBIA - DEPOSITO CANTINA DE RUTE</option>';
+            NOMBRE_options_str  += '<option value="LA ZUBIA - DEPOSITO CORVALES">LA ZUBIA - DEPOSITO CORVALES</option>';
+            NOMBRE_options_str  += '<option value="LA ZUBIA - DEPOSITO CUMBRES VERDES">LA ZUBIA - DEPOSITO CUMBRES VERDES</option>';
+            NOMBRE_options_str  += '<option value="LA ZUBIA - DEPOSITO HOYOS ALTOS">LA ZUBIA - DEPOSITO HOYOS ALTOS</option>';
+            NOMBRE_options_str  += '<option value="LA ZUBIA - DEPOSITO HOYOS BAJOS">LA ZUBIA - DEPOSITO HOYOS BAJOS</option>';
+            NOMBRE_options_str  += '<option value="LA ZUBIA - DEPOSITO LAUREL DE LA REINA">LA ZUBIA - DEPOSITO LAUREL DE LA REINA</option>';
+            NOMBRE_options_str  += '<option value="LA ZUBIA - DEPOSITO MIRADOR DEL REY">LA ZUBIA - DEPOSITO MIRADOR DEL REY</option>';
+            NOMBRE_options_str  += '<option value="LA ZUBIA - DEPOSITO PANSILLEVAS">LA ZUBIA - DEPOSITO PANSILLEVAS</option>';
+            NOMBRE_options_str  += '<option value="LA ZUBIA - POZO 1">LA ZUBIA - POZO 1</option>';
+            NOMBRE_options_str  += '<option value="LA ZUBIA - POZO 2">LA ZUBIA - POZO 2</option>';
+            NOMBRE_options_str  += '<option value="LA ZUBIA - POZO 3">LA ZUBIA - POZO 3</option>';
+            NOMBRE_options_str  += '<option value="LA ZUBIA - POZO HUENES BAJO">LA ZUBIA - POZO HUENES BAJO</option>';
+            NOMBRE_options_str  += '<option value="LAS GABIAS - DEPOSITO CUARTEL">LAS GABIAS - DEPOSITO CUARTEL</option>';
+            NOMBRE_options_str  += '<option value="LAS GABIAS - DEPOSITO CUESTA BLANQUILLA">LAS GABIAS - DEPOSITO CUESTA BLANQUILLA</option>';
+            NOMBRE_options_str  += '<option value="LAS GABIAS - DEPOSITO LA PATRONA">LAS GABIAS - DEPOSITO LA PATRONA</option>';
+            NOMBRE_options_str  += '<option value="LAS GABIAS - DEPOSITO PEDRO VERDE">LAS GABIAS - DEPOSITO PEDRO VERDE</option>';
+            NOMBRE_options_str  += '<option value="LAS GABIAS - DEPOSITO SAN JAVIER ALTO">LAS GABIAS - DEPOSITO SAN JAVIER ALTO</option>';
+            NOMBRE_options_str  += '<option value="LAS GABIAS - DEPOSITO SAN JAVIER BAJO">LAS GABIAS - DEPOSITO SAN JAVIER BAJO</option>';
+            NOMBRE_options_str  += '<option value="LAS GABIAS - POZO ARACHE">LAS GABIAS - POZO ARACHE</option>';
+            NOMBRE_options_str  += '<option value="LAS GABIAS - POZO CAMINO DE CHURRIANA 1">LAS GABIAS - POZO CAMINO DE CHURRIANA 1</option>';
+            NOMBRE_options_str  += '<option value="LAS GABIAS - POZO CAMINO DE CHURRIANA 2">LAS GABIAS - POZO CAMINO DE CHURRIANA 2</option>';
+            NOMBRE_options_str  += '<option value="LAS GABIAS - POZO FLAMENCO">LAS GABIAS - POZO FLAMENCO</option>';
+            NOMBRE_options_str  += '<option value="LAS GABIAS - REBOMBEO ANTIGUO SAN JAVIER (HIJAR)">LAS GABIAS - REBOMBEO ANTIGUO SAN JAVIER (HIJAR)</option>';
+            NOMBRE_options_str  += '<option value="LAS GABIAS - REBOMBEO NUEVO SAN JAVIER">LAS GABIAS - REBOMBEO NUEVO SAN JAVIER</option>';
+            NOMBRE_options_str  += '<option value="OGIJARES - DEPOSITO CUESTA COLORA">OGIJARES - DEPOSITO CUESTA COLORA</option>';
+            NOMBRE_options_str  += '<option value="OGIJARES - DEPOSITO DIPUTACIÓN">OGIJARES - DEPOSITO DIPUTACIÓN</option>';
+            NOMBRE_options_str  += '<option value="OGIJARES - DEPOSITO LOMA LINDA 1">OGIJARES - DEPOSITO LOMA LINDA 1</option>';
+            NOMBRE_options_str  += '<option value="OGIJARES - DEPOSITO LOMA LINDA 2">OGIJARES - DEPOSITO LOMA LINDA 2</option>';
+            NOMBRE_options_str  += '<option value="OGIJARES - DEPOSITO LOMA LINDA 3">OGIJARES - DEPOSITO LOMA LINDA 3</option>';
+            NOMBRE_options_str  += '<option value="OGIJARES - POZO SAN ANTONIO">OGIJARES - POZO SAN ANTONIO</option>';
+            NOMBRE_options_str  += '<option value="OGIJARES - REBOMBEO CERECILLO">OGIJARES - REBOMBEO CERECILLO</option>';
+            NOMBRE_options_str  += '<option value="OGIJARES - RIO DILAR 1">OGIJARES - RIO DILAR 1</option>';
+            NOMBRE_options_str  += '<option value="OGIJARES - RIO DILAR 2">OGIJARES - RIO DILAR 2</option>';
+            NOMBRE_options_str  += '<option value="OTURA - DEPOSITO CAMARA DE LOS PINOS">OTURA - DEPOSITO CAMARA DE LOS PINOS</option>';
+            NOMBRE_options_str  += '<option value="OTURA - DEPOSITO CORTIJO DE LA LUZ">OTURA - DEPOSITO CORTIJO DE LA LUZ</option>';
+            NOMBRE_options_str  += '<option value="OTURA - DEPOSITO LAS ALONDRAS">OTURA - DEPOSITO LAS ALONDRAS</option>';
+            NOMBRE_options_str  += '<option value="OTURA - DEPOSITO LAS ANDAS">OTURA - DEPOSITO LAS ANDAS</option>';
+            NOMBRE_options_str  += '<option value="OTURA - DEPOSITO LOS ANGELES">OTURA - DEPOSITO LOS ANGELES</option>';
+            NOMBRE_options_str  += '<option value="OTURA - DEPOSITO LOS GIRASOLES">OTURA - DEPOSITO LOS GIRASOLES</option>';
+            NOMBRE_options_str  += '<option value="OTURA - DEPOSITO LOS PINOS">OTURA - DEPOSITO LOS PINOS</option>';
+            NOMBRE_options_str  += '<option value="OTURA - DEPOSITO MONTECARLO">OTURA - DEPOSITO MONTECARLO</option>';
+            NOMBRE_options_str  += '<option value="OTURA - DEPOSITO ROSA DE LOS VIENTOS">OTURA - DEPOSITO ROSA DE LOS VIENTOS</option>';
+            NOMBRE_options_str  += '<option value="OTURA - DEPOSITO SANTA CLARA">OTURA - DEPOSITO SANTA CLARA</option>';
+            NOMBRE_options_str  += '<option value="OTURA - DEPOSITO VILLAS ROMANAS">OTURA - DEPOSITO VILLAS ROMANAS</option>';
+            NOMBRE_options_str  += '<option value="OTURA - DEPOSITO VIÑAS DEL REY">OTURA - DEPOSITO VIÑAS DEL REY</option>';
+            NOMBRE_options_str  += '<option value="OTURA - DEPOSITOS SUBESTACIÓN 1, 2 Y 3">OTURA - DEPOSITOS SUBESTACIÓN 1, 2 Y 3</option>';
+            NOMBRE_options_str  += '<option value="OTURA - POZO 1 LAS ALONDRAS">OTURA - POZO 1 LAS ALONDRAS</option>';
+            NOMBRE_options_str  += '<option value="OTURA - POZO 2 LAS ALONDRAS">OTURA - POZO 2 LAS ALONDRAS</option>';
+            NOMBRE_options_str  += '<option value="OTURA - POZO BP VIÑA DEL REY">OTURA - POZO BP VIÑA DEL REY</option>';
+            NOMBRE_options_str  += '<option value="OTURA - POZO CUESTA DE LA CHINA">OTURA - POZO CUESTA DE LA CHINA</option>';
+            NOMBRE_options_str  += '<option value="OTURA - POZO CUESTA DEL OLIVAR">OTURA - POZO CUESTA DEL OLIVAR</option>';
+            NOMBRE_options_str  += '<option value="OTURA - POZO DE LOS GIRASOLES 1">OTURA - POZO DE LOS GIRASOLES 1</option>';
+            NOMBRE_options_str  += '<option value="OTURA - POZO DE LOS GIRASOLES 2">OTURA - POZO DE LOS GIRASOLES 2</option>';
+            NOMBRE_options_str  += '<option value="OTURA - POZO DE LOS PINOS">OTURA - POZO DE LOS PINOS</option>';
+            NOMBRE_options_str  += '<option value="OTURA - POZO GRANDE VIÑA DEL REY">OTURA - POZO GRANDE VIÑA DEL REY</option>';
+            NOMBRE_options_str  += '<option value="OTURA - POZO LAS ANDAS">OTURA - POZO LAS ANDAS</option>';
+            NOMBRE_options_str  += '<option value="OTURA - POZO Y DEPOSITO LOS ALMENDROS">OTURA - POZO Y DEPOSITO LOS ALMENDROS</option>';
+            NOMBRE_options_str  += '<option value="OTURA - POZOS PISA LA MULICA">OTURA - POZOS PISA LA MULICA</option>';
+            NOMBRE_options_str  += '<option value="PARQUE DEL AGUA">PARQUE DEL AGUA</option>';
+            NOMBRE_options_str  += '<option value="PINOS GENIL - DEPOSITO PINILLOS">PINOS GENIL - DEPOSITO PINILLOS</option>';
+            NOMBRE_options_str  += '<option value="PINOS GENIL - DEPOSITO PINOS BAJOS">PINOS GENIL - DEPOSITO PINOS BAJOS</option>';
+            NOMBRE_options_str  += '<option value="PINOS GENIL - DEPOSITOS PINOS ALTO">PINOS GENIL - DEPOSITOS PINOS ALTO</option>';
+            NOMBRE_options_str  += '<option value="SEDE SOCIAL">SEDE SOCIAL</option>';
+            NOMBRE_options_str  += '<option value="SONDEO 1">SONDEO 1</option>';
+            NOMBRE_options_str  += '<option value="SONDEO 10">SONDEO 10</option>';
+            NOMBRE_options_str  += '<option value="SONDEO 11">SONDEO 11</option>';
+            NOMBRE_options_str  += '<option value="SONDEO 12">SONDEO 12</option>';
+            NOMBRE_options_str  += '<option value="SONDEO 13">SONDEO 13</option>';
+            NOMBRE_options_str  += '<option value="SONDEO 14">SONDEO 14</option>';
+            NOMBRE_options_str  += '<option value="SONDEO 2">SONDEO 2</option>';
+            NOMBRE_options_str  += '<option value="SONDEO 3B">SONDEO 3B</option>';
+            NOMBRE_options_str  += '<option value="SONDEO 4B">SONDEO 4B</option>';
+            NOMBRE_options_str  += '<option value="SONDEO 5">SONDEO 5</option>';
+            NOMBRE_options_str  += '<option value="SONDEO 6">SONDEO 6</option>';
+            NOMBRE_options_str  += '<option value="SONDEO 7">SONDEO 7</option>';
+            NOMBRE_options_str  += '<option value="SONDEO 8">SONDEO 8</option>';
+            NOMBRE_options_str  += '<option value="SONDEO 9">SONDEO 9</option>';
+            sel_NOMBRE.innerHTML = NOMBRE_options_str;
+            div_NOMBRE.appendChild(sel_NOMBRE);
+            var lab_NOMBRE = document.createElement('div');
+            lab_NOMBRE.innerHTML = 'NOMBRE';
+            lab_NOMBRE.className = 'filterlabel';
+            div_NOMBRE.appendChild(lab_NOMBRE);
+            var reset_NOMBRE = document.createElement('div');
+            reset_NOMBRE.innerHTML = 'clear filter';
+            reset_NOMBRE.className = 'filterlabel';
+            reset_NOMBRE.onclick = function() {
+                var options = document.getElementById("sel_NOMBRE").options;
+                for (var i=0; i < options.length; i++) {
+                    options[i].selected = false;
+                }
+                filterFunc();
+            };
+            div_NOMBRE.appendChild(reset_NOMBRE);
+        </script>        
+    </body>
+</html>
