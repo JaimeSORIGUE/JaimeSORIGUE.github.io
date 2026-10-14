@@ -136,9 +136,14 @@
     var s = {};
     try { s = zoneStyleFn ? zoneStyleFn(f) : {}; } catch (e) { s = {}; }
     s = L.extend({ color: '#003e7e', weight: 1, fillColor: '#7cc6e8', fillOpacity: .35, opacity: 1 }, s);
+    // Borde rojo siempre visible (más grueso cuanto más alejado); el relleno sigue el deslizador de opacidad
+    var z = map.getZoom();
+    s.fillOpacity = (s.fillOpacity == null ? 1 : s.fillOpacity) * zoneOp;
+    s.color = ZONE_RED; s.opacity = 1; s.weight = z >= 18 ? 2 : z >= 16 ? 2.5 : 3.5;
     s.pane = 'vzZones'; s.interactive = true;
     return s;
   }
+  var ZONE_RED = '#e3001b', zoneOp = 0.6, zonesOn = true;
   var zonesLayer = L.geoJSON(null, {
     style: zoneStyle, pane: 'vzZones',
     onEachFeature: function (f, l) {
@@ -146,6 +151,26 @@
     }
   }).addTo(map);
   var hiLayer = L.layerGroup().addTo(map);
+  // Marcadores rojos por zona para verlas al alejar el mapa (zonas pequeñas y dispersas)
+  map.createPane('vzZmark'); map.getPane('vzZmark').style.zIndex = 460;
+  var ZMARK_MAXZOOM = 16;   // hasta este zoom (incluido) se ven los puntos rojos de zona
+  var zoneMarks = L.layerGroup();
+  function buildZoneMarks() {
+    zoneMarks.clearLayers();
+    zones.forEach(function (z) {
+      if (!Object.keys(z.lotes).some(function (l) { return passLote(l); })) return;
+      var c = zoneTarget(z); if (!c) return;
+      var m = L.circleMarker(c, { pane: 'vzZmark', radius: 7, weight: 2.5, color: '#ffffff', fillColor: ZONE_RED, fillOpacity: 1 });
+      m.bindTooltip(esc(z.name), { className: 'vz-tt', direction: 'top', offset: [0, -8] });
+      m.on('click', function (e) { L.DomEvent.stopPropagation(e); openZone(z, true); });
+      zoneMarks.addLayer(m);
+    });
+  }
+  function syncZoneMarks() {
+    var show = zonesOn && map.getZoom() <= ZMARK_MAXZOOM;
+    if (show && !map.hasLayer(zoneMarks)) zoneMarks.addTo(map); else if (!show && map.hasLayer(zoneMarks)) map.removeLayer(zoneMarks);
+  }
+  map.on('zoomend', function () { zonesLayer.setStyle(zoneStyle); syncZoneMarks(); });
   var treeRenderer = L.canvas({ padding: .5, pane: 'vzTrees', tolerance: 6 });
   var treeLayer = L.layerGroup().addTo(map);
   trees.forEach(function (t) {
@@ -269,6 +294,7 @@
     trees.forEach(function (t) { if (passTree(t)) { treeLayer.addLayer(t.m); visible.push(t); } });
     zonesLayer.clearLayers();
     zonesGJ.features.forEach(function (f) { if (passLote(f.properties[F.zLote])) zonesLayer.addData(f); });
+    buildZoneMarks(); syncZoneMarks();
     var nAct = (state.lote !== 'all') + (state.especie !== 'all') + (state.f1 !== 'all') + (state.foto ? 1 : 0);
     fbtn.classList.toggle('active', nAct > 0); $('.badge', fbtn).textContent = nAct;
     $('#vz-count .n').textContent = fmt(visible.length);
@@ -406,10 +432,10 @@
       lyrPanel.querySelectorAll('[data-b]').forEach(function (x) { x.classList.toggle('on', x === b); });
     });
   });
-  function setZoneOpacity(v) { map.getPane('vzZones').style.opacity = v / 100; $('#vz-opzv').textContent = v + '%'; }
+  function setZoneOpacity(v) { zoneOp = v / 100; zonesLayer.setStyle(zoneStyle); $('#vz-opzv').textContent = v + '%'; }
   setZoneOpacity(60);
   $('#vz-opz').addEventListener('input', function (e) { setZoneOpacity(+e.target.value); });
-  $('#vz-tz').addEventListener('change', function (e) { if (e.target.checked) zonesLayer.addTo(map); else { map.removeLayer(zonesLayer); hiLayer.clearLayers(); } $('#vz-opz').disabled = !e.target.checked; });
+  $('#vz-tz').addEventListener('change', function (e) { zonesOn = e.target.checked; if (zonesOn) zonesLayer.addTo(map); else { map.removeLayer(zonesLayer); hiLayer.clearLayers(); } syncZoneMarks(); $('#vz-opz').disabled = !e.target.checked; });
   $('#vz-tv').addEventListener('change', function (e) { vialesOn = e.target.checked; syncViales(); });
   $('#vz-tt').addEventListener('change', function (e) { if (e.target.checked) treeLayer.addTo(map); else map.removeLayer(treeLayer); });
   var me = null;
