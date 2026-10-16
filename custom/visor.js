@@ -52,7 +52,7 @@
     var p = f.properties, c = f.geometry && f.geometry.coordinates;
     if (!c) return null;
     if (Array.isArray(c[0])) c = c[0];
-    return { i: i, p: p, ll: L.latLng(c[1], c[0]), id: p[F.id], lote: (p[F.lote] === null || p[F.lote] === undefined || p[F.lote] === '') ? 3 : p[F.lote], esp: p[F.especie] || 'Sin especie', estado: p[F.estado] || '', f1: p[F.f1], f1t: p[F.f1term], foto: photoUrl(p[F.foto]) };
+    return { i: i, p: p, ll: L.latLng(c[1], c[0]), id: p[F.id], lote: (p[F.lote] === null || p[F.lote] === undefined || p[F.lote] === '') ? 3 : p[F.lote], esp: p[F.especie] || 'Sin especie', comun: (CFG.comunes && CFG.comunes[p[F.especie]]) || 'Sin especie', estado: p[F.estado] || '', f1: p[F.f1], f1t: p[F.f1term], foto: photoUrl(p[F.foto]) };
   }).filter(Boolean);
 
   function photoUrl(v) {
@@ -99,6 +99,8 @@
 
   /* ---------------- estado de filtros ---------------- */
   var state = { lote: 'all', especie: 'all', f1: 'all', foto: false };
+  var espMode = 'lat';   // pestaña de especie: 'lat' (nombre latín) o 'com' (nombre común)
+  function espOf(t) { return espMode === 'com' ? t.comun : t.esp; }
   var ESTADOS = [
     { k: 'NORMAL', l: 'Normal', c: '#2e9d55' },
     { k: 'ALTERADO', l: 'Alterado', c: '#e9a23b' },
@@ -123,7 +125,7 @@
     return true;
   }
   function passTree(t, skip) {
-    return (skip === 'lote' || passLote(t.lote)) && (skip === 'esp' || state.especie === 'all' || t.esp === state.especie) &&
+    return (skip === 'lote' || passLote(t.lote)) && (skip === 'esp' || state.especie === 'all' || espOf(t) === state.especie) &&
       (skip === 'f1' || passF1(t)) && (skip === 'foto' || !state.foto || !!t.foto);
   }
 
@@ -248,7 +250,7 @@
       var hits = trees.filter(function (t) { return t.id != null && String(t.id) === qq; });
       var partial = hits.length ? [] : trees.filter(function (t) { return t.id != null && String(t.id).indexOf(qq) === 0; }).slice(0, 30);
       items = hits.concat(partial).map(function (t) {
-        return { html: '<div class="vz-res"><span class="ic" style="color:' + estadoInfo(t.estado).c + '">' + ICON.tree + '</span><span class="tx"><div class="t">ID ' + esc(t.id) + ' · ' + esc(t.esp) + '</div><div class="s">' + esc(t.p[F.nombre] || '') + (t.lote != null ? ' · Lote ' + esc(t.lote) : '') + '</div></span></div>', go: function () { openTree(t, true); } };
+        return { html: '<div class="vz-res"><span class="ic" style="color:' + estadoInfo(t.estado).c + '">' + ICON.tree + '</span><span class="tx"><div class="t">ID ' + esc(t.id) + ' · ' + esc(t.esp) + (t.comun !== 'Sin especie' ? ' <span style="font-weight:500;color:var(--ink-2)">(' + esc(t.comun.split(',')[0]) + ')</span>' : '') + '</div><div class="s">' + esc(t.p[F.nombre] || '') + (t.lote != null ? ' · Lote ' + esc(t.lote) : '') + '</div></span></div>', go: function () { openTree(t, true); } };
       });
       res.innerHTML = items.length ? items.map(function (i) { return i.html; }).join('') : '<div class="vz-empty">No existe ningún árbol con ese ID</div>';
     }
@@ -266,7 +268,7 @@
   function renderFilters() {
     var lotes = {}; trees.forEach(function (t) { if (t.lote != null && t.lote !== '') lotes[t.lote] = 1; });
     var lotesK = Object.keys(lotes).sort(function (a, b) { return a - b; });
-    var spp = {}; trees.forEach(function (t) { if (passTree(t, 'esp')) spp[t.esp] = (spp[t.esp] || 0) + 1; });
+    var spp = {}; trees.forEach(function (t) { if (passTree(t, 'esp')) { var k = espOf(t); spp[k] = (spp[k] || 0) + 1; } });
     var sppK = Object.keys(spp).sort(function (a, b) { return a.localeCompare(b, 'es'); });
     if (state.especie !== 'all' && !spp[state.especie]) sppK.unshift(state.especie);
     fpanel.innerHTML =
@@ -274,7 +276,8 @@
       '<div class="vz-group"><label>Lote</label><div class="vz-chips">' + chip('lote', 'all', 'Todos', countWhere('lote', function () { return true; })) +
       lotesK.map(function (l) { return chip('lote', l, 'Lote ' + l, countWhere('lote', function (t) { return String(t.lote) === l; })); }).join('') +
       '</div></div>' +
-      '<div class="vz-group"><label>Especie</label><select class="vz-select" id="vz-esp"><option value="all">Todas las especies</option>' +
+      '<div class="vz-group"><label>Especie</label><div class="vz-seg"><button data-em="lat"' + (espMode === 'lat' ? ' class="on"' : '') + '>Nombre latín</button><button data-em="com"' + (espMode === 'com' ? ' class="on"' : '') + '>Nombre común</button></div>' +
+      '<select class="vz-select" id="vz-esp"><option value="all">Todas las especies</option>' +
       sppK.map(function (s) { return '<option value="' + esc(s) + '"' + (s === state.especie ? ' selected' : '') + '>' + esc(s) + ' (' + fmt(spp[s] || 0) + ')</option>'; }).join('') + '</select></div>' +
       '<div class="vz-group"><label>Inspección F1</label><div class="vz-chips">' +
       chip('f1', 'all', 'Todos', countWhere('f1', function () { return true; })) +
@@ -284,6 +287,12 @@
       '<div class="vz-group"><label>Leyenda · estado del árbol</label><div class="vz-legend">' + ESTADOS.map(function (e) { return '<span><i style="background:' + e.c + '"></i>' + e.l + '</span>'; }).join('') + '</div></div>';
     fpanel.querySelectorAll('.vz-chip').forEach(function (b) { b.addEventListener('click', function () { state[b.dataset.g] = b.dataset.v; apply(); }); });
     $('#vz-esp').addEventListener('change', function (e) { state.especie = e.target.value; apply(); });
+    fpanel.querySelectorAll('.vz-seg button').forEach(function (b) { b.addEventListener('click', function () {
+      if (b.dataset.em === espMode) return;
+      // al cambiar de pestaña se traduce la especie elegida al otro nombre (si había una)
+      if (state.especie !== 'all') { var t0 = trees.find(function (t) { return espOf(t) === state.especie; }); espMode = b.dataset.em; state.especie = t0 ? espOf(t0) : 'all'; }
+      else espMode = b.dataset.em;
+      apply(); renderFilters(); }); });
     $('#vz-foto').addEventListener('change', function (e) { state.foto = e.target.checked; apply(); });
     $('#vz-reset').addEventListener('click', function () { state = { lote: 'all', especie: 'all', f1: 'all', foto: false }; apply(); });
   }
@@ -386,14 +395,14 @@
       (norm(t.f1t) === 'si' ? '<span class="vz-pill">F1 terminada</span>' : '<span class="vz-pill" style="color:var(--ink-3)">F1 sin terminar</span>') + '</div>';
     SECTIONS.forEach(function (s) {
       var rows = '';
-      s.f.forEach(function (f) { used[f] = 1; if (f in p && !isEmpty(p[f]) && CFG.hidden.indexOf(f) < 0) rows += row(f, p[f]); });
+      s.f.forEach(function (f) { used[f] = 1; if (f in p && !isEmpty(p[f]) && CFG.hidden.indexOf(f) < 0) { rows += row(f, p[f]); if (f === F.especie && t.comun !== 'Sin especie') rows += '<div class="vz-row"><div class="lb">Nombre común</div><div class="vl">' + esc(t.comun) + '</div></div>'; } });
       if (rows) body += '<div class="vz-sec"><h4>' + esc(s.t) + '</h4><div class="vz-dl">' + rows + '</div></div>';
     });
     var rest = '';
     Object.keys(p).forEach(function (f) { if (!used[f] && CFG.hidden.indexOf(f) < 0 && !isEmpty(p[f])) rest += row(f, p[f]); });
     if (rest) body += '<div class="vz-sec"><h4>Otros datos</h4><div class="vz-dl">' + rest + '</div></div>';
     body += '<a class="vz-btn2" href="' + mapsUrl(t.ll) + '" target="_blank" rel="noopener">' + ICON.nav + ' Cómo llegar al árbol</a>';
-    openSheet('<div class="hd"><div><div class="k">Árbol · ID ' + esc(t.id != null ? t.id : '—') + '</div><h2>' + esc(t.esp) + '</h2><div class="sub">' + esc(p[F.nombre] || p[F.lugar] || '') + (t.lote != null ? ' · Lote ' + esc(t.lote) : '') + '</div></div><button class="x" aria-label="Cerrar">×</button></div><div class="bd">' + body + '</div>');
+    openSheet('<div class="hd"><div><div class="k">Árbol · ID ' + esc(t.id != null ? t.id : '—') + '</div><h2><i>' + esc(t.esp) + '</i></h2>' + (t.comun !== 'Sin especie' ? '<div class="vz-comun">' + esc(t.comun) + '</div>' : '') + '<div class="sub">' + esc(p[F.nombre] || p[F.lugar] || '') + (t.lote != null ? ' · Lote ' + esc(t.lote) : '') + '</div></div><button class="x" aria-label="Cerrar">×</button></div><div class="bd">' + body + '</div>');
     var ph = $('#vz-ph'); if (ph) ph.addEventListener('click', function () { $('img', lb).src = t.foto; lb.classList.add('show'); });
   }
 
